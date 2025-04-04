@@ -4,7 +4,7 @@
   become: true
   vars:
     mongodb_bind_ip: "127.0.0.1"  
-    mongodb_admin_user: "admin"
+    mongodb_admin_user: "Eniola"
     mongodb_admin_password: "admin123!"
 
   tasks:
@@ -84,10 +84,16 @@
       until: user_creation is succeeded
       retries: 3
       delay: 5
+    
+    - name: update test page
+      template:
+      src: test.j2
+      dest: /var/www/html/test.html
 
   handlers:
     - name: restart mongod
       ansible.builtin.service:
         name: mongod
         state: restarted
+        
 ...
