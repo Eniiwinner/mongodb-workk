@@ -1,0 +1,19 @@
+- name: Install HTTP server
+  hosts: node1
+  become: yes
+
+  tasks:
+    - name: Install HTTPD
+      yum:
+        name: httpd
+        state: present
+
+    - name: start HTTPD
+      service:
+        name: httpd
+        state: started
+
+    - name: enable HTTPD
+      service:
+        name: httpd
+        enabled: yes
