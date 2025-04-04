@@ -11,6 +11,6 @@
   tasks:
     - name: Update Test page
       template:
-        src: unique.j2
+        src: html.j2
         dest: /var/www/html/test.html
 ...
