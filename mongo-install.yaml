@@ -1,5 +1,4 @@
 ---
----
 - name: Install MongoDB on CentOS 9
   hosts: n1
   become: true
