@@ -4,7 +4,7 @@
   become: yes
 
   tasks:
-  - name: update freeze page
+  - name: update test page
     template:
       src: html.j2
       dest: /var/www/html/test.html
