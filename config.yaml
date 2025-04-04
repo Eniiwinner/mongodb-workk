@@ -1,39 +1,22 @@
-- name: Configure MongoDB on CentOS 9
-  hosts: n1
+---
+- name: Configure MongoDB 7.0 Repository
+  hosts: all
   become: true
-
-
   tasks:
-    
-    - name: Create custom MongoDB config directory
-      ansible.builtin.file:
-        path: /etc/mongod.conf.d
-        state: directory
-        mode: 0755
-
-    - name: Create admin user
-      community.mongodb.mongodb_user:
-        login_host: "127.0.0.1"
-        login_port: "{{ mongodb_port }}"
-        database: admin
-        name: "{{ mongodb_admin_user }}"
-        password: "{{ mongodb_admin_password }}"
-        roles: "root"
+    - name: Import MongoDB GPG key
+      ansible.builtin.rpm_key:
         state: present
-      register: user_creation
-      until: user_creation is succeeded
-      retries: 3
-      delay: 5
+        key: https://pgp.mongodb.com/server-7.0.asc
 
-    - name: Enable firewall rule
-      ansible.builtin.firewalld:
-        port: "{{ mongodb_port }}/tcp"
-        permanent: true
-        state: enabled
-      when: ansible_os_family == 'CentOS'
+    - name: Add MongoDB 7.0 repository
+      ansible.builtin.yum_repository:
+        name: mongodb-org-7.0
+        description: MongoDB 7.0 Repository
+        baseurl: https://repo.mongodb.org/yum/redhat/9/mongodb-org/7.0/x86_64/
+        gpgcheck: yes
+        gpgkey: https://pgp.mongodb.com/server-7.0.asc
+        enabled: yes
 
-  handlers:
-    - name: Restart MongoDB
-      ansible.builtin.service:
-        name: mongod
-        state: restarted
+    - name: Refresh package metadata
+      ansible.builtin.dnf:
+        update_cache: yes
