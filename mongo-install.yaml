@@ -1,0 +1,26 @@
+---
+- hosts: n1
+  become: true
+  tasks:
+    - name: Add MongoDB repository
+      yum_repository:
+        name: mongodb-org-7.0
+        baseurl: https://repo.mongodb.org/yum/amazon/2023/{{ ansible_distribution_major_version }}/mongodb-org-{{ ansible_distribution_major_version }}/
+        gpgcheck: 0
+        state: present
+
+    - name: Install MongoDB packages
+      yum:
+        name:
+          - mongodb-org
+          - mongodb-org-server
+          - mongodb-org-mongos
+          - mongodb-org-tools
+          - mongodb-org-database-tools-extra
+        state: present
+
+    - name: Start MongoDB service
+      systemd:
+        name: mongod
+        state: started
+        enabled: yes
