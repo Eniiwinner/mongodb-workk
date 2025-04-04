@@ -1,20 +1,34 @@
 ---
-- hosts: n1
+---
+- name: Install MongoDB on CentOS 9
+  hosts: n1
   become: true
   tasks:
- 
+    - name: Add MongoDB GPG key
+      ansible.builtin.rpm_key:
+        state: present
+        key: "https://www.mongodb.org/static/pgp/server-7.0.asc"
+
+    - name: Add MongoDB repository
+      ansible.builtin.yum_repository:
+        name: mongodb-org-7.0
+        description: MongoDB Repository
+        baseurl: https://repo.mongodb.org/yum/redhat/9/mongodb-org/7.0/x86_64/
+        gpgcheck: yes
+        gpgkey: https://www.mongodb.org/static/pgp/server-7.0.asc
+        enabled: yes
+
     - name: Install MongoDB packages
-      yum:
+      ansible.builtin.dnf:
         name:
           - mongodb-org
           - mongodb-org-server
           - mongodb-org-mongos
           - mongodb-org-tools
-          - mongodb-org-database-tools-extra
         state: present
 
-    - name: Start MongoDB service
-      systemd:
+    - name: Start and enable MongoDB service
+      ansible.builtin.service:
         name: mongod
         state: started
         enabled: yes
