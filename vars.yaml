@@ -1,15 +1,14 @@
 ---
- - name: Variables Custom
-   hosts: g1
-   become: yes
-   vars:
+- name: Variables Custom
+  hosts: g1
+  become: yes
+  vars:
     mongodb_bind_ip: "127.0.0.1"  
-    mongodb_admin_user: "Eniola:
+    mongodb_admin_user: "Eniola"
     mongodb_admin_password: "admin123!"
-    myusername: Eniola
+    myusername: "Eniola"
 
-  
-   tasks:
+  tasks:
     - name: Update Test page
       template:
         src: unique.j2
