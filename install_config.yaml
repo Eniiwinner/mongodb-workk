@@ -36,7 +36,7 @@
     - name: Configure MongoDB
       template:
         src: db.j2
-        dest: /etc/mongod.conf
+        dest: /etc/db.conf
         owner: root
         group: root
         mode: 0644
