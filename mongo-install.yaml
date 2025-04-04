@@ -1,8 +1,14 @@
 ---
-- name: Install MongoDB on CentOS 9
+- name: Install and Configure MongoDB on CentOS 9
   hosts: n1
   become: true
+  vars:
+    mongodb_bind_ip: "127.0.0.1"  
+    mongodb_admin_user: "admin"
+    mongodb_admin_password: "admin123!"
+
   tasks:
+   
     - name: Add MongoDB GPG key
       ansible.builtin.rpm_key:
         state: present
@@ -22,13 +28,48 @@
         name:
           - mongodb-org
           - mongodb-org-server
-          - mongodb-org-mongos
-          - mongodb-org-tools
+          - mongodb-org-shell
+          - mongodb-mongosh
         state: present
+
+    - name: Create custom MongoDB config directory
+      ansible.builtin.file:
+        path: /etc/mongod.conf.d
+        state: directory
+        mode: 0755
+
+    - name: Configure MongoDB
+      ansible.builtin.template:
+        src: mongod.conf.j2
+        dest: /etc/mongod.conf
+        owner: root
+        group: root
+        mode: 0644
+      notify: restart mongod
 
     - name: Start and enable MongoDB service
       ansible.builtin.service:
         name: mongod
         state: started
         enabled: yes
+
+    - name: Create admin user
+      community.mongodb.mongodb_user:
+        login_host: "127.0.0.1"
+        login_port: 27017
+        database: admin
+        name: "{{ mongodb_admin_user }}"
+        password: "{{ mongodb_admin_password }}"
+        roles: "root"
+        state: present
+      register: user_creation
+      until: user_creation is succeeded
+      retries: 3
+      delay: 5
+
+  handlers:
+    - name: restart mongod
+      ansible.builtin.service:
+        name: mongod
+        state: restarted
 ...

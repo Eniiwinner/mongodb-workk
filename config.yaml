@@ -20,3 +20,4 @@
     - name: Refresh package metadata
       ansible.builtin.dnf:
         update_cache: yes
+...
