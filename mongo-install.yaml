@@ -8,7 +8,6 @@
     mongodb_admin_password: "admin123!"
 
   tasks:
-
     - name: Add MongoDB GPG key
       rpm_key:
         state: present
@@ -40,7 +39,7 @@
 
     - name: Configure MongoDB
       template:
-        src: db.j2  # Changed from db.j2 to standard naming
+        src: db.j2
         dest: /etc/mongod.conf
         owner: root
         group: root
@@ -56,7 +55,7 @@
     - name: Install PyMongo dependency
       block:
         - name: Install pip (if not present)
-          ansible.builtin.dnf:
+          dnf:
             name: python3-pip
             state: present
           when: ansible_distribution == 'CentOS'
@@ -87,13 +86,12 @@
     
     - name: update test page
       template:
-      src: test.j2
-      dest: /var/www/html/test.html
+        src: test.j2
+        dest: /var/www/html/test.html
 
   handlers:
     - name: restart mongod
-      ansible.builtin.service:
+      service:
         name: mongod
         state: restarted
-        
 ...
