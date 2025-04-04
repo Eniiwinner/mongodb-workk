@@ -40,7 +40,7 @@
 
     - name: Configure MongoDB
       ansible.builtin.template:
-        src: mongod.conf.j2
+        src: db.j2
         dest: /etc/mongod.conf
         owner: root
         group: root
