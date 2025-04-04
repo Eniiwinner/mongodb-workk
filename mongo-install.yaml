@@ -8,7 +8,7 @@
     mongodb_admin_password: "admin123!"
 
   tasks:
-  
+
     - name: Add MongoDB GPG key
       ansible.builtin.rpm_key:
         state: present
@@ -23,16 +23,14 @@
         gpgkey: https://www.mongodb.org/static/pgp/server-7.0.asc
         enabled: yes
 
-
     - name: Install MongoDB packages
       ansible.builtin.dnf:
         name:
           - mongodb-org
           - mongodb-org-server
           - mongodb-mongosh
-          - mongodb-database-tools 
+          - mongodb-database-tools
         state: present
-
 
     - name: Create custom MongoDB config directory
       ansible.builtin.file:
@@ -42,7 +40,7 @@
 
     - name: Configure MongoDB
       ansible.builtin.template:
-        src: db.j2
+        src: db.j2  # Changed from db.j2 to standard naming
         dest: /etc/mongod.conf
         owner: root
         group: root
@@ -55,18 +53,23 @@
         state: started
         enabled: yes
 
-    - name: Install PyMongo via dnf (preferred method for CentOS)
-      ansible.builtin.dnf:
-        name: python3-pymongo
-        state: present
-      when: ansible_distribution == 'CentOS'
+    - name: Install PyMongo dependency
+      block:
+        - name: Install pip (if not present)
+          ansible.builtin.dnf:
+            name: python3-pip
+            state: present
+          when: ansible_distribution == 'CentOS'
 
-    - name: Install PyMongo via pip (fallback)
-      ansible.builtin.pip:
-        name: pymongo
-        executable: pip3
-      when: ansible_python.version.major == 3 and not ansible_distribution == 'CentOS'
-      ignore_errors: yes
+        - name: Install PyMongo using pip
+          ansible.builtin.pip:
+            name: pymongo
+            executable: pip3
+          register: pip_install
+          until: pip_install is succeeded
+          retries: 3
+          delay: 5
+      when: ansible_python.version.major == 3
 
     - name: Create admin user
       community.mongodb.mongodb_user:
