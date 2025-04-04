@@ -2,6 +2,10 @@
 - name: Install and Configure MongoDB on CentOS 9
   hosts: n1
   become: true
+  vars:
+    mongodb_bind_ip: "127.0.0.1"
+    mongodb_admin_user: "Eniola"
+    mongodb_admin_password: "admin123!"
 
   tasks:
     - name: Add MongoDB GPG key
