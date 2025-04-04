@@ -1,5 +1,5 @@
 - name: Install HTTP server
-  hosts: node1
+  hosts: n1
   become: yes
 
   tasks:
