@@ -28,7 +28,7 @@
         name:
           - mongodb-org
           - mongodb-org-server
-          - mongodb-org-shell
+          - mongodb-mongosh
           - mongodb-mongosh
         state: present
 
