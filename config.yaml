@@ -1,0 +1,48 @@
+- name: Configure MongoDB on CentOS 9
+  hosts: n1
+  become: true
+
+
+  tasks:
+    
+    - name: Create custom MongoDB config directory
+      ansible.builtin.file:
+        path: /etc/mongod.conf.d
+        state: directory
+        mode: 0755
+
+    - name: Deploy MongoDB configuration
+      ansible.builtin.template:
+        src: mongod.conf.j2
+        dest: /etc/mongod.conf
+        owner: root
+        group: root
+        mode: 0644
+      notify: Restart MongoDB
+
+    - name: Create admin user
+      community.mongodb.mongodb_user:
+        login_host: "127.0.0.1"
+        login_port: "{{ mongodb_port }}"
+        database: admin
+        name: "{{ mongodb_admin_user }}"
+        password: "{{ mongodb_admin_password }}"
+        roles: "root"
+        state: present
+      register: user_creation
+      until: user_creation is succeeded
+      retries: 3
+      delay: 5
+
+    - name: Enable firewall rule
+      ansible.builtin.firewalld:
+        port: "{{ mongodb_port }}/tcp"
+        permanent: true
+        state: enabled
+      when: ansible_os_family == 'CentOS'
+
+  handlers:
+    - name: Restart MongoDB
+      ansible.builtin.service:
+        name: mongod
+        state: restarted
