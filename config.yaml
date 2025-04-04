@@ -11,15 +11,6 @@
         state: directory
         mode: 0755
 
-    - name: Deploy MongoDB configuration
-      ansible.builtin.template:
-        src: mongod.conf.j2
-        dest: /etc/mongod.conf
-        owner: root
-        group: root
-        mode: 0644
-      notify: Restart MongoDB
-
     - name: Create admin user
       community.mongodb.mongodb_user:
         login_host: "127.0.0.1"
