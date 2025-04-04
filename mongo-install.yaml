@@ -10,12 +10,12 @@
   tasks:
 
     - name: Add MongoDB GPG key
-      ansible.builtin.rpm_key:
+      rpm_key:
         state: present
         key: "https://www.mongodb.org/static/pgp/server-7.0.asc"
 
     - name: Add MongoDB repository
-      ansible.builtin.yum_repository:
+      yum_repository:
         name: mongodb-org-7.0
         description: MongoDB Repository
         baseurl: https://repo.mongodb.org/yum/redhat/9/mongodb-org/7.0/x86_64/
@@ -24,7 +24,7 @@
         enabled: yes
 
     - name: Install MongoDB packages
-      ansible.builtin.dnf:
+      dnf:
         name:
           - mongodb-org
           - mongodb-org-server
@@ -33,13 +33,13 @@
         state: present
 
     - name: Create custom MongoDB config directory
-      ansible.builtin.file:
+      file:
         path: /etc/mongod.conf.d
         state: directory
         mode: 0755
 
     - name: Configure MongoDB
-      ansible.builtin.template:
+      template:
         src: db.j2  # Changed from db.j2 to standard naming
         dest: /etc/mongod.conf
         owner: root
@@ -48,7 +48,7 @@
       notify: restart mongod
 
     - name: Start and enable MongoDB service
-      ansible.builtin.service:
+      service:
         name: mongod
         state: started
         enabled: yes
@@ -62,7 +62,7 @@
           when: ansible_distribution == 'CentOS'
 
         - name: Install PyMongo using pip
-          ansible.builtin.pip:
+          pip:
             name: pymongo
             executable: pip3
           register: pip_install
