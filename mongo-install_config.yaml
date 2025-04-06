@@ -71,14 +71,6 @@
           delay: 5
       when: ansible_python.version.major == 3
 
-    - name: Wait for MongoDB to be available
-      wait_for:
-        host: 127.0.0.1
-        port: 27017
-        state: started
-        timeout: 60
-        delay: 10
-
     - name: Create admin user
       community.mongodb.mongodb_user:
         login_host: "127.0.0.1"
