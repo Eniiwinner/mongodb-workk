@@ -41,7 +41,7 @@
     - name: Configure MongoDB
       template:
         src: db.j2
-        dest: /etc/mongod.conf  # Ensure this is the correct location for your MongoDB config file
+        dest: /etc/db.conf
         owner: root
         group: root
         mode: 0644
