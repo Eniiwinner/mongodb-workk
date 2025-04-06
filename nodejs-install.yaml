@@ -43,7 +43,7 @@
 
     - name: Start Node.js app with PM2
       shell: |
-        pm2 start app.js --name myapp
+        pm2 start index.js --name myapp
         pm2 save
         pm2 startup
       args:
