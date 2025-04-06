@@ -49,7 +49,7 @@
 
     - name: Modify mongod systemd service to use custom config file
       lineinfile:
-        path: /etc/systemd/system/mongod.service
+        path: /usr/lib/systemd/system/mongod.service  # Update this path based on your system
         regexp: '^ExecStart='
         line: 'ExecStart=/usr/bin/mongod --config /etc/db.conf'
       notify: reload systemd
