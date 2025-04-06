@@ -11,6 +11,11 @@
         name: nodejs
         state: present
 
+    - name: Install Git
+      yum:
+       name: git
+       state: present
+
     - name: Clone Node.js app repo
       git:
         repo: https://github.com/Eniiwinner/mongodb-workk.git
