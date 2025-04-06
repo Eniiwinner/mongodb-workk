@@ -6,9 +6,9 @@
     mongodb_bind_ip: "127.0.0.1"
     mongodb_admin_user: "Eniola"
     mongodb_admin_password: "admin123!"
-    MONGO_URI=mongodb://Eniola:admin123!@localhost:27017/devops?authSource=admin
+    mongodb_uri: "mongodb://Eniola:admin123!@localhost:27017/devops?authSource=admin"
 
-    tasks:
+  tasks:
     - name: Add MongoDB GPG key
       rpm_key:
         state: present
