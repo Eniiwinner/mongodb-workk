@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const app = express();
 const mongoURI = 'mongodb+srv://eniiwinner:<8KE076mhgYc0t8cS>@cluster0.ds4fi1q.mongodb.net/devops?retryWrites=true&w=majority'
+const PORT = process.env.PORT || 3000;
 
 mongoose.connect('mongodb://localhost/devops', { useNewUrlParser: true, useUnifiedTopology: true });
 
