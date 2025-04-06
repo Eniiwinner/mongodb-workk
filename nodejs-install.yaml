@@ -34,7 +34,7 @@
         dest: /var/www/nodeapp/.env
         content: |
           PORT=3000
-          mongoose.connect(mongoURI || 'mongodb://localhost/devops')
+          MONGO_URI=mongodb://localhost:27017/devops
 
     - name: Install PM2 globally
       npm:
