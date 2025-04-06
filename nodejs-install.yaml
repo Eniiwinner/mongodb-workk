@@ -48,3 +48,4 @@
         pm2 startup
       args:
         chdir: /var/www/nodeapp
+...
