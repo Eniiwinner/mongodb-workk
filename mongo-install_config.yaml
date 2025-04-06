@@ -41,7 +41,7 @@
     - name: Configure MongoDB
       template:
         src: db.j2
-        dest: /etc/db.conf
+        dest: /etc/mongod.conf  # Ensure this is the correct location for your MongoDB config file
         owner: root
         group: root
         mode: 0644
@@ -61,14 +61,14 @@
             state: present
           when: ansible_distribution == 'CentOS'
 
-    - name: Install PyMongo using pip
-      pip:
-        name: pymongo
-        executable: pip3
-        register: pip_install
-        until: pip_install is succeeded
-        retries: 3
-        delay: 5
+        - name: Install PyMongo using pip
+          pip:
+            name: pymongo
+            executable: pip3
+          register: pip_install
+          until: pip_install is succeeded
+          retries: 3
+          delay: 5
       when: ansible_python.version.major == 3
 
     - name: Wait for MongoDB to be available
@@ -92,7 +92,7 @@
       until: user_creation is succeeded
       retries: 3
       delay: 5
-    
+
     - name: update test page
       template:
         src: html.j2
@@ -103,6 +103,4 @@
       service:
         name: mongod
         state: restarted
-
-      
 ...
