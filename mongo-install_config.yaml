@@ -61,15 +61,23 @@
             state: present
           when: ansible_distribution == 'CentOS'
 
-        - name: Install PyMongo using pip
-          pip:
-            name: pymongo
-            executable: pip3
-          register: pip_install
-          until: pip_install is succeeded
-          retries: 3
-          delay: 5
+    - name: Install PyMongo using pip
+      pip:
+        name: pymongo
+        executable: pip3
+        register: pip_install
+        until: pip_install is succeeded
+        retries: 3
+        delay: 5
       when: ansible_python.version.major == 3
+
+    - name: Wait for MongoDB to be available
+      wait_for:
+        host: 127.0.0.1
+        port: 27017
+        state: started
+        timeout: 60
+        delay: 10
 
     - name: Create admin user
       community.mongodb.mongodb_user:
