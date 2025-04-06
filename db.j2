@@ -1,4 +1,3 @@
-
 systemLog:
   destination: file
   logAppend: true
@@ -7,13 +6,14 @@ systemLog:
 storage:
   dbPath: /var/lib/mongo
   journal:
-    enabled: true  
+    enabled: true
   wiredTiger:
     engineConfig:
       cacheSizeGB: 1
 
 net:
   port: 27017
-  bindIp: {{ mongodb_bind_ip }} 
+  bindIp: {{ mongodb_bind_ip }}
+
 security:
-  authorization: "enabled"  
+  authorization: enabled

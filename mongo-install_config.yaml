@@ -47,6 +47,13 @@
         mode: 0644
       notify: restart mongod
 
+    - name: Modify mongod systemd service to use custom config file
+      lineinfile:
+        path: /usr/lib/systemd/system/mongod.service
+        regexp: '^ExecStart='
+        line: 'ExecStart=/usr/bin/mongod --config /etc/db.conf'
+      notify: reload systemd
+
     - name: Start and enable MongoDB service
       service:
         name: mongod
