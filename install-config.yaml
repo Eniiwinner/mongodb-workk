@@ -10,7 +10,7 @@
     mongodb_connection_timeout: 60
 
   tasks:
-   
+  
     - name: Add MongoDB GPG key
       rpm_key:
         state: present
@@ -100,13 +100,6 @@
           until: pip_install is succeeded
           retries: 3
           delay: 5
-    
-    - name: Wait for MongoDB to start accepting connections
-      wait_for:
-        host: "{{ mongodb_primary_ip }}"
-        port: 27017
-        delay: 10
-        timeout: 60
     
     - name: Check MongoDB authentication status
       shell: |
