@@ -1,17 +1,80 @@
 ---
-- name: Install and Configure MongoDB and Node.js on CentOS 9
+- name: Install and Deploy MongoDB with Node.js App on CentOS 9
   hosts: n1
   become: true
   vars:
-    mongodb_bind_ip: "3.86.98.40"
+    mongodb_bind_ip: "13.218.80.200" 
     mongodb_admin_user: "Eniola"
     mongodb_admin_password: "admin123!"
-    node_project_path: "/var/www/devops-api"
+    node_project_path: "/var/www/nodeapp"
     node_version: "18.x"
-    node_user: "{{ ansible_user_id }}"  
+    node_user: "{{ ansible_user_id }}"
+    app_repo: "https://github.com/Eniiwinner/mongodb-workk.git"
+    app_branch: "main"
 
   tasks:
-  
+
+    - name: Add MongoDB GPG key
+      rpm_key:
+        state: present
+        key: "https://www.mongodb.org/static/pgp/server-7.0.asc"
+
+    - name: Add MongoDB repository
+      yum_repository:
+        name: mongodb-org-7.0
+        description: MongoDB Repository
+        baseurl: https://repo.mongodb.org/yum/redhat/9/mongodb-org/7.0/x86_64/
+        gpgcheck: yes
+        gpgkey: https://www.mongodb.org/static/pgp/server-7.0.asc
+        enabled: yes
+
+    - name: Install MongoDB packages
+      dnf:
+        name:
+          - mongodb-org
+          - mongodb-org-server
+          - mongodb-mongosh
+          - mongodb-database-tools
+        state: present
+
+    - name: Create custom MongoDB config directory
+      file:
+        path: /etc/mongod.conf.d
+        state: directory
+        mode: 0755
+
+    - name: Configure MongoDB
+      template:
+        src: db.j2
+        dest: /etc/db.conf
+        owner: root
+        group: root
+        mode: 0644
+      notify: restart mongod
+
+    - name: Start and enable MongoDB service
+      service:
+        name: mongod
+        state: started
+        enabled: yes
+
+    - name: Install PyMongo dependency
+      block:
+        - name: Install pip (if not present)
+          dnf:
+            name: python3-pip
+            state: present
+
+        - name: Install PyMongo using pip
+          pip:
+            name: pymongo
+            executable: pip3
+          register: pip_install
+          until: pip_install is succeeded
+          retries: 3
+          delay: 5
+
+
     - name: Add NodeSource repository
       shell: |
         curl -fsSL https://rpm.nodesource.com/setup_{{ node_version }} | bash -
@@ -40,34 +103,69 @@
         owner: "{{ node_user }}"
         group: "{{ node_user }}"
 
-    - name: Deploy package.json
-      copy:
-        dest: "{{ node_project_path }}/package.json"
-        content: |
-          {
-            "name": "devops-api",
-            "version": "1.0.0",
-            "main": "index.js",
-            "scripts": {
-              "start": "node index.js",
-              "seed": "node init.js"
-            },
-            "dependencies": {
-              "express": "^4.18.2",
-              "mongoose": "^7.2.2"
-            }
-          }
-        owner: "{{ node_user }}"
-        group: "{{ node_user }}"
-        mode: 0644
+    - name: Clone Node.js app repo
+      git:
+        repo: "{{ app_repo }}"
+        dest: "{{ node_project_path }}"
+        version: "{{ app_branch }}"
+        force: yes
+        update: yes
 
     - name: Install project dependencies
       npm:
         path: "{{ node_project_path }}"
         state: present
+        production: yes
       when: node_version_check.rc == 0
       environment:
         NPM_CONFIG_PREFIX: "{{ node_project_path }}/.npm-global"
       vars:
         ansible_become_user: "{{ node_user }}"
-...
+
+    - name: Create .env file
+      copy:
+        dest: "{{ node_project_path }}/.env"
+        content: |
+          PORT=3000
+          MONGO_URI=mongodb://13.218.80.200:27017/devops-api  # Updated IP here
+          ADMIN_USER={{ mongodb_admin_user }}
+          ADMIN_PASSWORD={{ mongodb_admin_password }}
+        owner: "{{ node_user }}"
+        group: "{{ node_user }}"
+        mode: 0640
+
+    - name: Install PM2 globally
+      npm:
+        name: pm2
+        global: yes
+      when: node_version_check.rc == 0
+
+    - name: Create admin user
+      community.mongodb.mongodb_user:
+        login_host: "13.218.80.200" 
+        login_port: 27017
+        database: admin
+        name: "{{ mongodb_admin_user }}"
+        password: "{{ mongodb_admin_password }}"
+        roles: "root"
+        state: present
+        update_password: always
+      register: user_creation
+      retries: 5
+      delay: 10
+      until: user_creation is succeeded
+
+    - name: Start Node.js app with PM2
+      shell: |
+        pm2 start {{ node_project_path }}/app.js --name myapp
+        pm2 save
+        pm2 startup
+      args:
+        chdir: "{{ node_project_path }}"
+      when: node_version_check.rc == 0
+
+  handlers:
+    - name: restart mongod
+      service:
+        name: mongod
+        state: restarted
