@@ -70,6 +70,12 @@
         group: mongod
         mode: 0755
 
+    - name: Create systemd override directory for mongod
+      file:
+        path: /etc/systemd/system/mongod.service.d
+        state: directory
+        mode: 0755
+
     - name: Create systemd override to use custom config
       copy:
         dest: /etc/systemd/system/mongod.service.d/override.conf
