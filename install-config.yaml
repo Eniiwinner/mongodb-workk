@@ -3,7 +3,7 @@
   hosts: n1
   become: true
   vars:
-    mongodb_primary_ip: "172.31.86.23"
+    mongodb_bind_ip: "172.31.86.23"
     mongodb_admin_user: "Eniola"
     mongodb_admin_password: "admin123!"
     mongodb_restart_timeout: 60
@@ -14,7 +14,7 @@
       rpm_key:
         state: present
         key: "https://www.mongodb.org/static/pgp/server-7.0.asc"
-    
+
     - name: Add MongoDB repository
       yum_repository:
         name: mongodb-org-7.0
@@ -23,7 +23,7 @@
         gpgcheck: yes
         gpgkey: https://www.mongodb.org/static/pgp/server-7.0.asc
         enabled: yes
-    
+
     - name: Install MongoDB packages
       dnf:
         name:
@@ -32,18 +32,18 @@
           - mongodb-mongosh
           - mongodb-database-tools
         state: present
-    
+
     - name: Create custom MongoDB config directory
       file:
-        path: /etc/mongod.conf.d
+        path: /etc/db.conf.d
         state: directory
         mode: 0755
-    
+
     - name: Create MongoDB configuration file
       copy:
-        dest: /etc/mongod.conf
+        dest: /etc/db.conf
         content: |
-          # mongod.conf
+          # MongoDB Configuration
           storage:
             dbPath: /var/lib/mongo
             journal:
@@ -61,28 +61,37 @@
         group: root
         mode: 0644
       notify: restart mongod
-    
-    - name: Create MongoDB log directory
+
+    - name: Ensure MongoDB log directory exists
       file:
         path: /var/log/mongodb
         state: directory
         owner: mongod
         group: mongod
         mode: 0755
-    
+
+    - name: Create systemd override to use custom config
+      copy:
+        dest: /etc/systemd/system/mongod.service.d/override.conf
+        content: |
+          [Service]
+          ExecStart=
+          ExecStart=/usr/bin/mongod --config /etc/db.conf
+      notify: reload systemd
+
     - name: Start and enable MongoDB service
       service:
         name: mongod
         state: started
         enabled: yes
-    
+
     - name: Install PyMongo dependency
       block:
         - name: Install pip (if not present)
           dnf:
             name: python3-pip
             state: present
-        
+
         - name: Install PyMongo using pip
           pip:
             name: pymongo
@@ -91,10 +100,10 @@
           until: pip_install is succeeded
           retries: 3
           delay: 5
-    
+
     - name: Check MongoDB authentication status
       shell: |
-        grep -A1 "security:" /etc/mongod.conf || echo "auth_not_found"
+        grep -A1 "security:" /etc/db.conf || echo "auth_not_found"
       args:
         executable: /bin/bash
       register: auth_status
@@ -107,22 +116,22 @@
 
     - name: Temporarily disable authentication if enabled
       block:
-        - name: Backup mongod.conf
+        - name: Backup config file
           copy:
-            src: /etc/mongod.conf
-            dest: /etc/mongod.conf.bak
+            src: /etc/db.conf
+            dest: /etc/db.conf.bak
             remote_src: true
 
         - name: Disable authentication
           replace:
-            path: /etc/mongod.conf
+            path: /etc/db.conf
             regexp: '(?m)^(\s*)authorization:\s*enabled'
             replace: '\1# authorization: disabled_temp'
           notify: restart mongod
 
         - name: Wait for MongoDB to be ready
           wait_for:
-            host: "{{ mongodb_primary_ip }}"
+            host: "{{ mongodb_bind_ip }}"
             port: 27017
             timeout: "{{ mongodb_connection_timeout }}"
             delay: 5
@@ -131,7 +140,7 @@
 
     - name: Create admin user
       community.mongodb.mongodb_user:
-        login_host: "{{ mongodb_primary_ip }}"
+        login_host: "{{ mongodb_bind_ip }}"
         login_port: 27017
         database: admin
         name: "{{ mongodb_admin_user }}"
@@ -147,14 +156,14 @@
       block:
         - name: Restore auth config
           replace:
-            path: /etc/mongod.conf
+            path: /etc/db.conf
             regexp: '# authorization: disabled_temp'
             replace: 'authorization: enabled'
           notify: restart mongod
 
         - name: Verify admin access
           command: >
-            mongosh --host "{{ mongodb_primary_ip }}"
+            mongosh --host "{{ mongodb_bind_ip }}"
             --username "{{ mongodb_admin_user }}"
             --password "{{ mongodb_admin_password }}"
             --eval "db.adminCommand({ping: 1})"
@@ -172,4 +181,7 @@
         enabled: yes
       async: "{{ mongodb_restart_timeout }}"
       poll: 0
+
+    - name: reload systemd
+      command: systemctl daemon-reexec
 ...
