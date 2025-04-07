@@ -3,7 +3,7 @@
   hosts: n1
   become: true
   vars:
-    mongodb_bind_ip: "172.31.89.122,172.31.86.23"
+    mongodb_primary_ip: "172.31.86.23"  
     mongodb_admin_user: "Eniola"
     mongodb_admin_password: "admin123!"
 
@@ -88,9 +88,9 @@
           delay: 5
       when: ansible_python.version.major == 3
 
-    - name: Create admin user (initial attempt)
+    - name: Create admin user on primary instance
       community.mongodb.mongodb_user:
-        login_host: "{{ mongodb_bind_ip }}"
+        login_host: "{{ mongodb_primary_ip }}"
         login_port: 27017
         database: admin
         name: "{{ mongodb_admin_user }}"
@@ -104,4 +104,3 @@
       template:
         src: html.j2
         dest: /var/www/html
-...
