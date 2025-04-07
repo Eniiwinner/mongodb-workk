@@ -43,9 +43,9 @@
         state: directory
         mode: 0755
 
-    - name: Configure MongoDB
+    - name: Configure MongoDB using template
       template:
-        src: mongod.j2
+        src: mongod.conf.j2
         dest: /etc/mongod.conf
         owner: root
         group: root

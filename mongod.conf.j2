@@ -1,0 +1,16 @@
+# mongod.conf
+
+# Network interface settings
+net:
+  port: 27017             # Port to bind to
+  bindIp: {{ mongodb_bind_ip }}   # Bind to your specified IP address
+
+# Storage settings
+storage:
+  dbPath: /var/lib/mongo   # Path to the database files
+  journal:
+    enabled: true          # Enable journaling for data durability
+
+# Security settings
+security:
+  authorization: enabled   # Enable authentication
