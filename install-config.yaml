@@ -6,9 +6,11 @@
     mongodb_bind_ip: "3.86.98.40"
     mongodb_admin_user: "Eniola"
     mongodb_admin_password: "admin123!"
-    node_project_path: "/var/www/your-node-app"  
+    node_project_path: "/var/www/your-node-app"
+    node_version: "18.x"
 
   tasks:
+
     - name: Add MongoDB GPG key
       rpm_key:
         state: present
@@ -59,7 +61,6 @@
           dnf:
             name: python3-pip
             state: present
-          when: ansible_distribution == 'CentOS'
 
         - name: Install PyMongo using pip
           pip:
@@ -69,26 +70,42 @@
           until: pip_install is succeeded
           retries: 3
           delay: 5
-      when: ansible_python.version.major == 3
+
+
+    - name: Add NodeSource repository
+      shell: |
+        curl -fsSL https://rpm.nodesource.com/setup_{{ node_version }} | bash -
+      args:
+        executable: /bin/bash
+      register: nodesource_setup
+      changed_when: "'Run as root' not in nodesource_setup.stdout"
 
     - name: Install Node.js and npm
       dnf:
-        name:
-          - nodejs
-          - npm
+        name: nodejs
         state: present
+        disable_gpg_check: yes 
+      when: nodesource_setup is succeeded
+
+    - name: Verify Node.js installation
+      command: node --version
+      register: node_version_check
+      changed_when: false
 
     - name: Install nodemon globally
       npm:
         name: nodemon
         global: yes
         state: present
+      when: node_version_check.rc == 0
 
     - name: Install project dependencies
       npm:
         path: "{{ node_project_path }}"
         state: present
+      when: node_version_check.rc == 0
 
+ 
     - name: Create admin user
       community.mongodb.mongodb_user:
         login_host: "127.0.0.1"
@@ -98,12 +115,13 @@
         password: "{{ mongodb_admin_password }}"
         roles: "root"
         state: present
+        update_password: always
       register: user_creation
+      retries: 5
+      delay: 10
       until: user_creation is succeeded
-      retries: 3
-      delay: 5
 
-    - name: update test page
+    - name: Update test page
       template:
         src: html.j2
         dest: /var/www/html/test.html
