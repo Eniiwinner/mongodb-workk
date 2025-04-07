@@ -6,13 +6,12 @@
     mongodb_primary_ip: "172.31.86.23"
     mongodb_admin_user: "Eniola"
     mongodb_admin_password: "admin123!"
-
   tasks:
     - name: Add MongoDB GPG key
       rpm_key:
         state: present
         key: "https://www.mongodb.org/static/pgp/server-7.0.asc"
-
+    
     - name: Add MongoDB repository
       yum_repository:
         name: mongodb-org-7.0
@@ -21,7 +20,7 @@
         gpgcheck: yes
         gpgkey: https://www.mongodb.org/static/pgp/server-7.0.asc
         enabled: yes
-
+    
     - name: Install MongoDB packages
       dnf:
         name:
@@ -30,36 +29,73 @@
           - mongodb-mongosh
           - mongodb-database-tools
         state: present
-
+    
     - name: Create custom MongoDB config directory
       file:
         path: /etc/mongod.conf.d
         state: directory
         mode: 0755
-
-    - name: Configure MongoDB using template
-      template:
-        src: mongod.conf.j2
+    
+    - name: Create MongoDB configuration file
+      copy:
         dest: /etc/mongod.conf
+        content: |
+          # mongod.conf
+          
+          # Where and how to store data.
+          storage:
+            dbPath: /var/lib/mongo
+            journal:
+              enabled: true
+          
+          # where to write logging data.
+          systemLog:
+            destination: file
+            logAppend: true
+            path: /var/log/mongodb/mongod.log
+          
+          # network interfaces
+          net:
+            port: 27017
+            bindIp: 0.0.0.0  # Allow connections from any IP
+          
+          # security settings
+          security:
+            authorization: enabled
         owner: root
         group: root
         mode: 0644
       notify: restart mongod
-
+    
+    - name: Create MongoDB log directory
+      file:
+        path: /var/log/mongodb
+        state: directory
+        owner: mongod
+        group: mongod
+        mode: 0755
+    
     - name: Start and enable MongoDB service
       service:
         name: mongod
         state: started
         enabled: yes
-
+    
+    - name: Open MongoDB port in firewall
+      firewalld:
+        port: 27017/tcp
+        permanent: yes
+        state: enabled
+      notify: reload firewall
+      ignore_errors: yes
+    
     - name: Install PyMongo dependency
       block:
         - name: Install pip (if not present)
           dnf:
             name: python3-pip
             state: present
-          when: ansible_distribution == 'CentOS'
-
+        
         - name: Install PyMongo using pip
           pip:
             name: pymongo
@@ -68,11 +104,57 @@
           until: pip_install is succeeded
           retries: 3
           delay: 5
-      when: ansible_python.version.major == 3
-
-    - name: Create admin user
-      community.mongodb.mongodb_user:
-        login_host: "172.31.86.23"
+    
+    - name: Wait for MongoDB to start accepting connections
+      wait_for:
+        host: "{{ mongodb_primary_ip }}"
+        port: 27017
+        delay: 10
+        timeout: 60
+    
+    - name: Initialize MongoDB for first admin user (disable auth temporarily)
+      block:
+        - name: Update MongoDB config to disable auth temporarily
+          copy:
+            dest: /etc/mongod.conf
+            content: |
+              # mongod.conf
+              
+              # Where and how to store data.
+              storage:
+                dbPath: /var/lib/mongo
+                journal:
+                  enabled: true
+              
+              # where to write logging data.
+              systemLog:
+                destination: file
+                logAppend: true
+                path: /var/log/mongodb/mongod.log
+              
+              # network interfaces
+              net:
+                port: 27017
+                bindIp: 0.0.0.0
+            owner: root
+            group: root
+            mode: 0644
+        
+        - name: Restart MongoDB to apply configuration
+          service:
+            name: mongod
+            state: restarted
+        
+        - name: Wait for MongoDB to restart
+          wait_for:
+            host: "{{ mongodb_primary_ip }}"
+            port: 27017
+            delay: 5
+            timeout: 30
+      
+    - name: Create admin user without authentication
+      mongodb_user:
+        login_host: "{{ mongodb_primary_ip }}"
         login_port: 27017
         database: admin
         name: "{{ mongodb_admin_user }}"
@@ -83,15 +165,53 @@
       until: user_creation is succeeded
       retries: 3
       delay: 5
-
+    
+    - name: Re-enable security after user creation
+      copy:
+        dest: /etc/mongod.conf
+        content: |
+          # mongod.conf
+          
+          # Where and how to store data.
+          storage:
+            dbPath: /var/lib/mongo
+            journal:
+              enabled: true
+          
+          # where to write logging data.
+          systemLog:
+            destination: file
+            logAppend: true
+            path: /var/log/mongodb/mongod.log
+          
+          # network interfaces
+          net:
+            port: 27017
+            bindIp: 0.0.0.0
+          
+          # security settings
+          security:
+            authorization: enabled
+        owner: root
+        group: root
+        mode: 0644
+      notify: restart mongod
+    
     - name: Update test page
       template:
         src: html.j2
-        dest: /var/www/html
-
+        dest: /var/www/html/index.html
+      ignore_errors: yes
+  
   handlers:
     - name: restart mongod
       service:
         name: mongod
         state: restarted
+    
+    - name: reload firewall
+      service:
+        name: firewalld
+        state: reloaded
+      ignore_errors: yes
 ...
