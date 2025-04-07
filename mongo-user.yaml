@@ -17,9 +17,13 @@
         state: present
 
     - name: Check MongoDB authentication status
-      command: grep -A1 "security:" /etc/mongod.conf || echo "auth_not_found"
+      shell: |
+        grep -A1 "security:" /etc/mongod.conf || echo "auth_not_found"
+      args:
+        executable: /bin/bash
       register: auth_status
       changed_when: false
+      ignore_errors: true
 
     - name: Temporarily disable authentication if enabled
       block:
