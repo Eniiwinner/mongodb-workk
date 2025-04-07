@@ -88,7 +88,7 @@
           delay: 5
       when: ansible_python.version.major == 3
 
-    - name: Create admin user on primary instance
+    - name: Create admin user
       community.mongodb.mongodb_user:
         login_host: "{{ mongodb_primary_ip }}"
         login_port: 28017
