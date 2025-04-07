@@ -3,7 +3,7 @@
   hosts: n1
   become: true
   vars:
-    mongodb_bind_ip: "172.31.86.23"
+    mongodb_bind_ip: "3.86.98.40"
     mongodb_admin_user: "Eniola"
     mongodb_admin_password: "admin123!"
     mongodb_restart_timeout: 60
