@@ -83,6 +83,9 @@
       until: user_creation is succeeded
       retries: 3
       delay: 5
+      register: create_admin
+      until: create_admin is succeeded
+      ignore_errors: yes
 
     - name: Update test page
       template:
