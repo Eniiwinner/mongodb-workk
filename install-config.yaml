@@ -3,7 +3,7 @@
   hosts: n1
   become: true
   vars:
-    mongodb_bind_ip: "172.31.86.23" 
+    mongodb_bind_ip: "127.0.0.1" 
     mongodb_admin_user: "Eniola"
     mongodb_admin_password: "admin123!"
     node_project_path: "/var/www/nodeapp"
@@ -45,7 +45,7 @@
         mode: 0755
 
 
-    - name: Configure MongoDB to listen only on 172.31.86.23
+    - name: Configure MongoDB to listen only on 127.0.0.1
       template:
         src: db.j2
         dest: /etc/db.conf
@@ -64,14 +64,14 @@
 
     - name: Verify MongoDB is listening on correct IP
       shell: |
-        ss -tulnp | grep '172.31.86.23:27017'
+        ss -tulnp | grep '127.0.0.1:27017'
       register: mongo_listening
       changed_when: false
       failed_when: mongo_listening.rc != 0
 
     - name: Create admin user
       community.mongodb.mongodb_user:
-        login_host: "172.31.86.23"
+        login_host: "127.0.0.1"
         login_port: 27017
         database: admin
         name: "{{ mongodb_admin_user }}"
