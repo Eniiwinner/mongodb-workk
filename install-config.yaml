@@ -10,7 +10,6 @@
     mongodb_connection_timeout: 60
 
   tasks:
-  
     - name: Add MongoDB GPG key
       rpm_key:
         state: present
@@ -45,25 +44,17 @@
         dest: /etc/mongod.conf
         content: |
           # mongod.conf
-          
-          # Where and how to store data.
           storage:
             dbPath: /var/lib/mongo
             journal:
               enabled: true
-          
-          # where to write logging data.
           systemLog:
             destination: file
             logAppend: true
             path: /var/log/mongodb/mongod.log
-          
-          # network interfaces
           net:
             port: 27017
-            bindIp: 0.0.0.0  # Allow connections from any IP
-          
-          # security settings
+            bindIp: 0.0.0.0
           security:
             authorization: enabled
         owner: root
@@ -129,19 +120,9 @@
             replace: '\1# authorization: disabled_temp'
           notify: restart mongod
 
-        - name: Verify MongoDB is reachable
-          wait_for:
-            host: "{{ mongodb_primary_ip }}"
-            port: 27017
-            timeout: "{{ mongodb_connection_timeout }}"
-            delay: 5
-          register: port_check
-          until: port_check is succeeded
-          retries: 3
-
       when: "'authorization: enabled' in auth_status.stdout"
 
-    - name: Create admin user
+    - name: Create admin user (with built-in connection retry)
       community.mongodb.mongodb_user:
         login_host: "{{ mongodb_primary_ip }}"
         login_port: 27017
@@ -153,8 +134,9 @@
         connect_timeout: 30
         socket_timeout: 30
       register: user_creation
-      retries: 3
-      delay: 5
+      retries: 5
+      delay: 10
+      until: user_creation is succeeded
 
     - name: Re-enable authentication if needed
       block:
@@ -165,7 +147,7 @@
             replace: 'authorization: enabled'
           notify: restart mongod
 
-        - name: Verify MongoDB is secure
+        - name: Verify admin access
           command: >
             mongosh --host "{{ mongodb_primary_ip }}"
             --username "{{ mongodb_admin_user }}"
