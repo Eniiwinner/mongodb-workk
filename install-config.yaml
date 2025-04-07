@@ -3,7 +3,7 @@
   hosts: n1
   become: true
   vars:
-    mongodb_bind_ip: "127.0.0.1" 
+    mongodb_bind_ip: "127.0.0.1"
     mongodb_admin_user: "Eniola"
     mongodb_admin_password: "admin123!"
     node_project_path: "/var/www/nodeapp"
@@ -12,9 +12,9 @@
     app_repo: "https://github.com/Eniiwinner/mongodb-workk.git"
     app_branch: "main"
     mongodb_connection_timeout: 60
+    mongodb_config_file: "/etc/db.conf"  
 
   tasks:
-
     - name: Add MongoDB GPG key
       rpm_key:
         state: present
@@ -44,34 +44,44 @@
         state: directory
         mode: 0755
 
-
-    - name: Configure MongoDB to listen only on 127.0.0.1
+    - name: Configure MongoDB
       template:
         src: db.j2
-        dest: /etc/db.conf
+        dest: "{{ mongodb_config_file }}" 
         owner: root
         group: root
         mode: 0644
       notify: restart mongod
+
+    - name: Create systemd override to use custom config
+      blockinfile:
+        path: /etc/systemd/system/mongod.service.d/override.conf
+        create: yes
+        block: |
+          [Service]
+          ExecStart=
+          ExecStart=/usr/bin/mongod --config {{ mongodb_config_file }}
+      notify:
+        - daemon-reload
+        - restart mongod
 
     - name: Start and enable MongoDB service
       service:
         name: mongod
         state: started
         enabled: yes
-      async: 120
-      poll: 0
 
-    - name: Verify MongoDB is listening on correct IP
-      shell: |
-        ss -tulnp | grep '127.0.0.1:27017'
+    - name: Verify MongoDB is listening
+      wait_for:
+        host: "{{ mongodb_bind_ip }}"
+        port: 27017
+        timeout: "{{ mongodb_connection_timeout }}"
       register: mongo_listening
       changed_when: false
-      failed_when: mongo_listening.rc != 0
 
     - name: Create admin user
       community.mongodb.mongodb_user:
-        login_host: "127.0.0.1"
+        login_host: "{{ mongodb_bind_ip }}"
         login_port: 27017
         database: admin
         name: "{{ mongodb_admin_user }}"
@@ -84,8 +94,11 @@
       delay: 15
       until: user_creation is succeeded
 
-
   handlers:
+    - name: daemon-reload
+      systemd:
+        daemon_reload: yes
+
     - name: restart mongod
       service:
         name: mongod
