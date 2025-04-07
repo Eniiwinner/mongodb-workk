@@ -78,6 +78,16 @@
           delay: 5
       when: ansible_python.version.major == 3
 
+    - name: Ensure MongoDB is running
+      service:
+        name: mongod
+        state: started
+        enabled: yes
+      register: mongo_service
+      until: mongo_service is succeeded
+      retries: 5
+      delay: 10
+
     - name: Create admin user
       community.mongodb.mongodb_user:
         login_host: "127.0.0.1"
@@ -91,6 +101,9 @@
       until: user_creation is succeeded
       retries: 3
       delay: 5
+      register: create_admin
+      until: create_admin is succeeded
+      ignore_errors: yes
 
     - name: update test page
       template:
