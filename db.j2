@@ -3,11 +3,9 @@ net:
   port: 27017
   bindIp: {{ mongodb_bind_ip }}
 
-# Storage
+# Storage (simplified for MongoDB 7.0+)
 storage:
   dbPath: /var/lib/mongo
-  journal:
-    enabled: true
 
 # Security
 security:
