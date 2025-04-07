@@ -8,14 +8,10 @@
     mongodb_admin_password: "admin123!"
     node_project_path: "/var/www/devops-api"
     node_version: "18.x"
-    node_user: "nginx"  # Using existing nginx user (common for web apps)
+    node_user: "{{ ansible_user_id }}"  
 
   tasks:
-    # Previous MongoDB tasks remain unchanged...
-
-    # ======================
-    # Node.js Installation
-    # ======================
+  
     - name: Add NodeSource repository
       shell: |
         curl -fsSL https://rpm.nodesource.com/setup_{{ node_version }} | bash -
@@ -65,11 +61,13 @@
         group: "{{ node_user }}"
         mode: 0644
 
-    - name: Install project dependencies as node user
-      become: true
-      become_user: "{{ node_user }}"
+    - name: Install project dependencies
       npm:
         path: "{{ node_project_path }}"
         state: present
       when: node_version_check.rc == 0
+      environment:
+        NPM_CONFIG_PREFIX: "{{ node_project_path }}/.npm-global"
+      vars:
+        ansible_become_user: "{{ node_user }}"
 ...
