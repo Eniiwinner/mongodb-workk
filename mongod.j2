@@ -1,3 +1,4 @@
+# MongoDB Configuration
 systemLog:
   destination: file
   logAppend: true
@@ -5,8 +6,9 @@ systemLog:
 
 storage:
   dbPath: /var/lib/mongo
-  journal:
-    enabled: true
+  wiredTiger:
+    engineConfig:
+      cacheSizeGB: 1  # Adjust based on available RAM
 
 net:
   port: 27017
