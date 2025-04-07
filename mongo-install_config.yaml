@@ -107,7 +107,6 @@
         delay: 10
         timeout: 60
     
-    # MongoDB Admin User Creation
     - name: Check MongoDB authentication status
       shell: |
         grep -A1 "security:" /etc/mongod.conf || echo "auth_not_found"
