@@ -116,8 +116,7 @@
           register: mongo_auth_test
           changed_when: false
           failed_when: "mongo_auth_test.rc != 0 or 'ok' not in mongo_auth_test.stdout"
-
-      when: "'authorization: enabled' in auth_status.stdout and user_creation is succeeded"
+          when: "'authorization: enabled' in auth_status.stdout and user_creation is succeeded"
 
     - name: Final validation
       debug:
