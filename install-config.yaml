@@ -1,11 +1,12 @@
 ---
-- name: Install and Configure MongoDB on CentOS 9
+- name: Install and Configure MongoDB and Node.js on CentOS 9
   hosts: n1
   become: true
   vars:
     mongodb_bind_ip: "3.86.98.40"
     mongodb_admin_user: "Eniola"
     mongodb_admin_password: "admin123!"
+    node_project_path: "/var/www/your-node-app"  
 
   tasks:
     - name: Add MongoDB GPG key
@@ -69,6 +70,24 @@
           retries: 3
           delay: 5
       when: ansible_python.version.major == 3
+
+    - name: Install Node.js and npm
+      dnf:
+        name:
+          - nodejs
+          - npm
+        state: present
+
+    - name: Install nodemon globally
+      npm:
+        name: nodemon
+        global: yes
+        state: present
+
+    - name: Install project dependencies
+      npm:
+        path: "{{ node_project_path }}"
+        state: present
 
     - name: Create admin user
       community.mongodb.mongodb_user:
