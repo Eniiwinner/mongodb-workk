@@ -1,17 +1,14 @@
 
+net:
+  port: 27017
+  bindIp: {{ mongodb_bind_ip }}
+
+# Storage
 storage:
   dbPath: /var/lib/mongo
   journal:
     enabled: true
 
-systemLog:
-  destination: file
-  logAppend: true
-  path: /var/log/mongodb/mongod.log
-
-net:
-  port: 27017
-  bindIp: 127.0.0.1
-
+# Security
 security:
   authorization: enabled
