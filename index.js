@@ -16,4 +16,8 @@ app.get('/', async (req, res) => {
     const names = devs.map(d => `<li>${d.name}</li>`).join('');
     res.send(`<h1>I’m building pipelines like a pro!</h1><ul>${names}</ul>`);
   } catch (err) {
-    res.status(500).send('Error retrieving developers
+    res.status(500).send('Error retrieving developers');
+  }
+});
+
+app.listen(PORT, () => console.log(`App running on port ${PORT}`));
