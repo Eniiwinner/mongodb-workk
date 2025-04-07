@@ -3,7 +3,7 @@
   hosts: n1
   become: true
   vars:
-    mongodb_bind_ip: "13.218.80.200" 
+    mongodb_bind_ip: "172.31.86.23" 
     mongodb_admin_user: "Eniola"
     mongodb_admin_password: "admin123!"
     node_project_path: "/var/www/nodeapp"
@@ -127,7 +127,7 @@
         dest: "{{ node_project_path }}/.env"
         content: |
           PORT=3000
-          MONGO_URI=mongodb://13.218.80.200:27017/devops-api  # Updated IP here
+          MONGO_URI=mongodb://172.31.86.23:27017/devops-api
           ADMIN_USER={{ mongodb_admin_user }}
           ADMIN_PASSWORD={{ mongodb_admin_password }}
         owner: "{{ node_user }}"
@@ -142,7 +142,7 @@
 
     - name: Create admin user
       community.mongodb.mongodb_user:
-        login_host: "13.218.80.200" 
+        login_host: "172.31.86.23" 
         login_port: 27017
         database: admin
         name: "{{ mongodb_admin_user }}"
