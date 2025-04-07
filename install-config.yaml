@@ -120,9 +120,16 @@
             replace: '\1# authorization: disabled_temp'
           notify: restart mongod
 
+        - name: Wait for MongoDB to be ready
+          wait_for:
+            host: "{{ mongodb_primary_ip }}"
+            port: 27017
+            timeout: "{{ mongodb_connection_timeout }}"
+            delay: 5
+
       when: "'authorization: enabled' in auth_status.stdout"
 
-    - name: Create admin user (with built-in connection retry)
+    - name: Create admin user
       community.mongodb.mongodb_user:
         login_host: "{{ mongodb_primary_ip }}"
         login_port: 27017
@@ -131,8 +138,6 @@
         password: "{{ mongodb_admin_password }}"
         roles: "root"
         state: present
-        connect_timeout: 30
-        socket_timeout: 30
       register: user_creation
       retries: 5
       delay: 10
