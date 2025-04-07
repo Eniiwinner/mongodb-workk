@@ -1,69 +1,126 @@
 ---
-- name: Configure MongoDB User
+- name: Configure MongoDB Admin User
   hosts: n1
   become: true
   vars:
     mongodb_primary_ip: "172.31.86.23"
     mongodb_admin_user: "Eniola"
     mongodb_admin_password: "admin123!"
+    mongodb_restart_timeout: 60
+    mongodb_connection_timeout: 30
+
   tasks:
-    - name: Install PyMongo (required for mongodb_user module)
+    - name: Ensure PyMongo is installed (required for mongodb_user module)
       pip:
         name: pymongo
         executable: pip3
-    
-    - name: Check if authentication is enabled
-      command: grep "authorization:" /etc/mongod.conf
+        state: present
+      register: pip_install
+      failed_when: pip_install.rc != 0
+      changed_when: "'Successfully installed' in pip_install.stdout"
+
+    - name: Check MongoDB authentication status
+      command: grep -A1 "security:" /etc/mongod.conf || echo "auth_not_found"
       register: auth_status
       changed_when: false
       ignore_errors: true
-    
-    - name: Display authentication status
+
+    - name: Display current authentication configuration
       debug:
-        var: auth_status.stdout
-    
+        msg: |
+          Current auth config:
+          {{ auth_status.stdout_lines | to_nice_json }}
+
     - name: Temporarily disable authentication if enabled
       block:
-        - name: Update MongoDB config to disable auth temporarily
+        - name: Backup original mongod.conf
+          copy:
+            src: /etc/mongod.conf
+            dest: /etc/mongod.conf.bak
+            remote_src: true
+
+        - name: Disable authentication in config
           replace:
             path: /etc/mongod.conf
-            regexp: 'security:\n  authorization: enabled'
-            replace: '# security section commented for initial user setup'
-        
-        - name: Restart MongoDB to apply configuration
+            regexp: '(?m)^(\s*)authorization:\s*enabled'
+            replace: '\1# authorization: disabled_temp'
+            backup: yes
+
+        - name: Restart MongoDB service
           service:
             name: mongod
             state: restarted
-        
-        - name: Wait for MongoDB to restart
+          async: "{{ mongodb_restart_timeout }}"
+          poll: 0
+
+        - name: Verify MongoDB is reachable after restart
           wait_for:
             host: "{{ mongodb_primary_ip }}"
             port: 27017
-            timeout: 30
-      when: auth_status.stdout is defined and "enabled" in auth_status.stdout
-    
-    - name: Create admin user
+            timeout: "{{ mongodb_connection_timeout }}"
+            delay: 5
+
+      when: "'authorization: enabled' in auth_status.stdout"
+      rescue:
+        - name: Restore original config if auth disable fails
+          copy:
+            src: /etc/mongod.conf.bak
+            dest: /etc/mongod.conf
+            remote_src: true
+          when: "'authorization: enabled' in auth_status.stdout"
+
+        - name: Force restart MongoDB with original config
+          service:
+            name: mongod
+            state: restarted
+            force: yes
+
+        - fail:
+            msg: "Failed to temporarily disable authentication. Check MongoDB logs."
+
+    - name: Create admin user (with retry for connection issues)
       community.mongodb.mongodb_user:
         login_host: "{{ mongodb_primary_ip }}"
         login_port: 27017
+        login_user: ""
+        login_password: ""
         database: admin
         name: "{{ mongodb_admin_user }}"
         password: "{{ mongodb_admin_password }}"
         roles: "root"
         state: present
       register: user_creation
-    
-    - name: Re-enable security after user creation
+      retries: 3
+      delay: 5
+      until: user_creation is succeeded
+      ignore_errors: "{{ auth_status.stdout is not defined or 'enabled' not in auth_status.stdout }}"
+
+    - name: Re-enable authentication if it was originally enabled
       block:
-        - name: Update MongoDB config to enable auth
+        - name: Restore original security configuration
           replace:
             path: /etc/mongod.conf
-            regexp: '# security section commented for initial user setup'
-            replace: 'security:\n  authorization: enabled'
-        
-        - name: Restart MongoDB to apply configuration
+            regexp: '# authorization: disabled_temp'
+            replace: 'authorization: enabled'
+            backup: no
+
+        - name: Restart MongoDB to apply security
           service:
             name: mongod
             state: restarted
-      when: auth_status.stdout is defined and "enabled" in auth_status.stdout and user_creation.changed
+          async: "{{ mongodb_restart_timeout }}"
+          poll: 0
+
+        - name: Verify MongoDB is secure
+          command: mongo --host "{{ mongodb_primary_ip }}" --eval "db.auth('{{ mongodb_admin_user }}', '{{ mongodb_admin_password }}'); db.adminCommand({ping: 1})"
+          register: mongo_auth_test
+          changed_when: false
+          failed_when: "mongo_auth_test.rc != 0 or 'ok' not in mongo_auth_test.stdout"
+
+      when: "'authorization: enabled' in auth_status.stdout and user_creation is succeeded"
+
+    - name: Final validation
+      debug:
+        msg: "MongoDB admin user '{{ mongodb_admin_user }}' successfully configured"
+      when: user_creation is succeeded
 ...
