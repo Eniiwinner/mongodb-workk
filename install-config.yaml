@@ -1,13 +1,11 @@
 ---
-- name: Install and Configure MongoDB on CentOS 9 and Create Admin User
+- name: Install and Configure MongoDB on CentOS 9
   hosts: n1
   become: true
   vars:
-    mongodb_bind_ip: "3.86.98.40"
+    mongodb_bind_ip: "127.0.0.1"
     mongodb_admin_user: "Eniola"
     mongodb_admin_password: "admin123!"
-    mongodb_restart_timeout: 60
-    mongodb_connection_timeout: 60
 
   tasks:
     - name: Add MongoDB GPG key
@@ -35,55 +33,18 @@
 
     - name: Create custom MongoDB config directory
       file:
-        path: /etc/db.conf.d
+        path: /etc/mongod.conf.d
         state: directory
         mode: 0755
 
-    - name: Create MongoDB configuration file
-      copy:
+    - name: Configure MongoDB
+      template:
+        src: db.j2
         dest: /etc/db.conf
-        content: |
-          # MongoDB Configuration
-          storage:
-            dbPath: /var/lib/mongo
-            journal:
-              enabled: true
-          systemLog:
-            destination: file
-            logAppend: true
-            path: /var/log/mongodb/mongod.log
-          net:
-            port: 27017
-            bindIp: 0.0.0.0
-          security:
-            authorization: enabled
         owner: root
         group: root
         mode: 0644
       notify: restart mongod
-
-    - name: Ensure MongoDB log directory exists
-      file:
-        path: /var/log/mongodb
-        state: directory
-        owner: mongod
-        group: mongod
-        mode: 0755
-
-    - name: Create systemd override directory for mongod
-      file:
-        path: /etc/systemd/system/mongod.service.d
-        state: directory
-        mode: 0755
-
-    - name: Create systemd override to use custom config
-      copy:
-        dest: /etc/systemd/system/mongod.service.d/override.conf
-        content: |
-          [Service]
-          ExecStart=
-          ExecStart=/usr/bin/mongod --config /etc/db.conf
-      notify: reload systemd
 
     - name: Start and enable MongoDB service
       service:
@@ -97,6 +58,7 @@
           dnf:
             name: python3-pip
             state: present
+          when: ansible_distribution == 'CentOS'
 
         - name: Install PyMongo using pip
           pip:
@@ -106,47 +68,11 @@
           until: pip_install is succeeded
           retries: 3
           delay: 5
-
-    - name: Check MongoDB authentication status
-      shell: |
-        grep -A1 "security:" /etc/db.conf || echo "auth_not_found"
-      args:
-        executable: /bin/bash
-      register: auth_status
-      changed_when: false
-      ignore_errors: true
-
-    - name: Display authentication status
-      debug:
-        var: auth_status.stdout
-
-    - name: Temporarily disable authentication if enabled
-      block:
-        - name: Backup config file
-          copy:
-            src: /etc/db.conf
-            dest: /etc/db.conf.bak
-            remote_src: true
-
-        - name: Disable authentication
-          replace:
-            path: /etc/db.conf
-            regexp: '(?m)^(\s*)authorization:\s*enabled'
-            replace: '\1# authorization: disabled_temp'
-          notify: restart mongod
-
-        - name: Wait for MongoDB to be ready
-          wait_for:
-            host: "{{ mongodb_bind_ip }}"
-            port: 27017
-            timeout: "{{ mongodb_connection_timeout }}"
-            delay: 5
-
-      when: "'authorization: enabled' in auth_status.stdout"
+      when: ansible_python.version.major == 3
 
     - name: Create admin user
       community.mongodb.mongodb_user:
-        login_host: "{{ mongodb_bind_ip }}"
+        login_host: "127.0.0.1"
         login_port: 27017
         database: admin
         name: "{{ mongodb_admin_user }}"
@@ -154,40 +80,18 @@
         roles: "root"
         state: present
       register: user_creation
-      retries: 5
-      delay: 10
       until: user_creation is succeeded
+      retries: 3
+      delay: 5
 
-    - name: Re-enable authentication if needed
-      block:
-        - name: Restore auth config
-          replace:
-            path: /etc/db.conf
-            regexp: '# authorization: disabled_temp'
-            replace: 'authorization: enabled'
-          notify: restart mongod
-
-        - name: Verify admin access
-          command: >
-            mongosh --host "{{ mongodb_bind_ip }}"
-            --username "{{ mongodb_admin_user }}"
-            --password "{{ mongodb_admin_password }}"
-            --eval "db.adminCommand({ping: 1})"
-          register: mongo_auth_test
-          changed_when: false
-          failed_when: "mongo_auth_test.rc != 0 or 'ok' not in mongo_auth_test.stdout"
-
-      when: "'authorization: enabled' in auth_status.stdout and user_creation is succeeded"
+    - name: update test page
+      template:
+        src: test.j2
+        dest: /var/www/html/test.html
 
   handlers:
     - name: restart mongod
       service:
         name: mongod
         state: restarted
-        enabled: yes
-      async: "{{ mongodb_restart_timeout }}"
-      poll: 0
-
-    - name: reload systemd
-      command: systemctl daemon-reexec
 ...

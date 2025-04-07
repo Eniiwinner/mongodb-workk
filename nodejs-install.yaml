@@ -1,97 +1,47 @@
 ---
-- name: Install and Configure MongoDB on CentOS 9
+- name: Install and Deploy Node.js App on CentOS
   hosts: n1
-  become: true
-  vars:
-    mongodb_bind_ip: "127.0.0.1"
-    mongodb_admin_user: "Eniola"
-    mongodb_admin_password: "admin123!"
-
+  become: yes
   tasks:
-    - name: Add MongoDB GPG key
-      rpm_key:
-        state: present
-        key: "https://www.mongodb.org/static/pgp/server-7.0.asc"
 
-    - name: Add MongoDB repository
-      yum_repository:
-        name: mongodb-org-7.0
-        description: MongoDB Repository
-        baseurl: https://repo.mongodb.org/yum/redhat/9/mongodb-org/7.0/x86_64/
-        gpgcheck: yes
-        gpgkey: https://www.mongodb.org/static/pgp/server-7.0.asc
-        enabled: yes
+    - name: Add Node.js repo
+      shell: curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
 
-    - name: Install MongoDB packages
-      dnf:
-        name:
-          - mongodb-org
-          - mongodb-org-server
-          - mongodb-mongosh
-          - mongodb-database-tools
+    - name: Install Node.js
+      yum:
+        name: nodejs
         state: present
 
-    - name: Create custom MongoDB config directory
-      file:
-        path: /etc/mongod.conf.d
-        state: directory
-        mode: 0755
+    - name: Clone Node.js app repo
+      git:
+        repo: https://github.com/Eniiwinner/mongodb-workk.git
+        dest: /var/www/nodeapp
+        version: main
+        force: yes
+        update: yes
 
-    - name: Configure MongoDB
-      template:
-        src: db.j2
-        dest: /etc/db.conf
-        owner: root
-        group: root
-        mode: 0644
-      notify: restart mongod
+    - name: Install Node.js dependencies
+      npm:
+        path: /var/www/nodeapp
+        production: yes
 
-    - name: Start and enable MongoDB service
-      service:
-        name: mongod
-        state: started
-        enabled: yes
+    - name: Create .env file
+      copy:
+        dest: /var/www/nodeapp/.env
+        content: |
+          PORT=3000
+          MONGO_URI=mongodb://localhost:27017/mydb
 
-    - name: Install PyMongo dependency
-      block:
-        - name: Install pip (if not present)
-          dnf:
-            name: python3-pip
-            state: present
-          when: ansible_distribution == 'CentOS'
+    - name: Install PM2 globally
+      npm:
+        name: pm2
+        global: yes
 
-        - name: Install PyMongo using pip
-          pip:
-            name: pymongo
-            executable: pip3
-          register: pip_install
-          until: pip_install is succeeded
-          retries: 3
-          delay: 5
-      when: ansible_python.version.major == 3
-
-    - name: Create admin user
-      community.mongodb.mongodb_user:
-        login_host: "127.0.0.1"
-        login_port: 27017
-        database: admin
-        name: "{{ mongodb_admin_user }}"
-        password: "{{ mongodb_admin_password }}"
-        roles: "root"
-        state: present
-      register: user_creation
-      until: user_creation is succeeded
-      retries: 3
-      delay: 5
-
-    - name: update test page
-      template:
-        src: test.j2
-        dest: /var/www/html/test.html
-
-  handlers:
-    - name: restart mongod
-      service:
-        name: mongod
-        state: restarted
+    - name: Start Node.js app with PM2
+      shell: |
+        pm2 start app.js --name myapp
+        pm2 save
+        pm2 startup
+      args:
+        chdir: /var/www/nodeapp
 ...
