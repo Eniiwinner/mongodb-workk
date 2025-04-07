@@ -90,5 +90,5 @@
     - name: Update test page
       template:
         src: test.j2
-        dest: /var/www
+        dest: /var/www/html
 ...
