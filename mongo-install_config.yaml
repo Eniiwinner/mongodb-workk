@@ -3,7 +3,7 @@
   hosts: n1
   become: true
   vars:
-    mongodb_primary_ip: "172.31.86.23"  
+    mongodb_primary_ip: "172.31.89.122"  
     mongodb_admin_user: "Eniola"
     mongodb_admin_password: "admin123!"
 
@@ -91,7 +91,7 @@
     - name: Create admin user on primary instance
       community.mongodb.mongodb_user:
         login_host: "{{ mongodb_primary_ip }}"
-        login_port: 27017
+        login_port: 28017
         database: admin
         name: "{{ mongodb_admin_user }}"
         password: "{{ mongodb_admin_password }}"
