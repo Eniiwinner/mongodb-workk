@@ -3,7 +3,7 @@
   hosts: n1
   become: true
   vars:
-    mongodb_bind_ip: "127.0.0.1"
+    mongodb_bind_ip: "172.31.89.122"
     mongodb_admin_user: "Eniola"
     mongodb_admin_password: "admin123!"
 
@@ -99,40 +99,6 @@
         state: present
       register: user_creation
       ignore_errors: yes
-
-    - name: Temporarily disable authentication if first attempt failed
-      lineinfile:
-        path: /etc/mongod.conf
-        regexp: '^  authorization:'
-        line: '  authorization: disabled'
-        state: present
-      when: user_creation is failed
-      notify: restart mongod
-
-    - name: Create admin user (without auth)
-      community.mongodb.mongodb_user:
-        login_host: "{{ mongodb_bind_ip }}"
-        login_port: 27017
-        database: admin
-        name: "{{ mongodb_admin_user }}"
-        password: "{{ mongodb_admin_password }}"
-        roles: "root"
-        state: present
-      when: user_creation is failed
-      register: user_creation_noauth
-
-    - name: Re-enable authentication
-      lineinfile:
-        path: /etc/mongod.conf
-        regexp: '^  authorization:'
-        line: '  authorization: enabled'
-        state: present
-      when: user_creation_noauth is succeeded
-      notify: restart mongod
-
-    - name: Verify admin user creation
-      debug:
-        msg: "Admin user creation status - First attempt: {{ user_creation is succeeded }}, Second attempt: {{ user_creation_noauth is succeeded if user_creation_noauth is defined else 'Not attempted' }}"
 
     - name: Update test page
       template:
