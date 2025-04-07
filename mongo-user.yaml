@@ -7,12 +7,11 @@
     mongodb_admin_user: "Eniola"
     mongodb_admin_password: "admin123!"
     mongodb_restart_timeout: 60
-    mongodb_connection_timeout: 30
-
+    mongodb_connection_timeout: 60 
   tasks:
     - name: Ensure PyMongo is installed
       pip:
-        name: pymongo
+        name: pymongo 3.11.4
         executable: pip3
         state: present
 
