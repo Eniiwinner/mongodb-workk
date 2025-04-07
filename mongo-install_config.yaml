@@ -3,7 +3,7 @@
   hosts: n1
   become: true
   vars:
-    mongodb_primary_ip: "172.31.86.23"
+    mongodb_bind_ip: "172.31.86.23"
     mongodb_admin_user: "Eniola"
     mongodb_admin_password: "admin123!"
     mongodb_restart_timeout: 60
@@ -43,9 +43,6 @@
       copy:
         dest: /etc/mongod.conf
         content: |
-          # mongod.conf
-          
-          # Where and how to store data.
           storage:
             dbPath: /var/lib/mongo
             journal:
@@ -132,7 +129,7 @@
 
         - name: Verify MongoDB is reachable
           wait_for:
-            host: "{{ mongodb_primary_ip }}"
+            host: "{{ mongodb_bind_ip }}"
             port: 27017
             timeout: "{{ mongodb_connection_timeout }}"
             delay: 5
@@ -141,7 +138,7 @@
 
     - name: Create admin user
       community.mongodb.mongodb_user:
-        login_host: "{{ mongodb_primary_ip }}"
+        login_host: "{{ mongodb_bind_ip }}"
         login_port: 27017
         database: admin
         name: "{{ mongodb_admin_user }}"
@@ -167,7 +164,7 @@
 
         - name: Verify MongoDB is secure
           command: >
-            mongo --host "{{ mongodb_primary_ip }}"
+            mongo --host "{{ mongodb_bind_ip }}"
             --eval "db.auth('{{ mongodb_admin_user }}', '{{ mongodb_admin_password }}'); db.adminCommand({ping: 1})"
           register: mongo_auth_test
           changed_when: false
