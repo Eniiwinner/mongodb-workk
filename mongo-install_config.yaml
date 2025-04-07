@@ -7,11 +7,6 @@
     mongodb_admin_user: "Eniola"
     mongodb_admin_password: "admin123!"
 
-  handlers:
-    - name: restart mongod
-      service:
-        name: mongod
-        state: restarted
 
   tasks:
     - name: Add MongoDB GPG key
@@ -52,23 +47,11 @@
         mode: 0644
       notify: restart mongod
 
-    - name: Ensure data directory permissions
-      file:
-        path: /var/lib/mongo
-        owner: mongod
-        group: mongod
-        mode: '0755'
-        recurse: yes
-
     - name: Start and enable MongoDB service
       service:
         name: mongod
         state: started
         enabled: yes
-      register: mongo_service
-      until: mongo_service is succeeded
-      retries: 5
-      delay: 10
 
     - name: Install PyMongo dependency
       block:
@@ -90,18 +73,26 @@
 
     - name: Create admin user
       community.mongodb.mongodb_user:
-        login_host: "{{ mongodb_primary_ip }}"
-        login_port: 28017
+        login_host: "172.31.89.122"
+        login_port: 27017
         database: admin
         name: "{{ mongodb_admin_user }}"
         password: "{{ mongodb_admin_password }}"
         roles: "root"
         state: present
-      register: user_creation
-      ignore_errors: yes
+        register: user_creation
+        until: user_creation is succeeded
+        retries: 3
+        delay: 5
 
     - name: Update test page
       template:
         src: html.j2
         dest: /var/www/html
+
+      handlers:
+        - name: restart mongod
+          service:
+           name: mongod
+           state: restarted
 ...
