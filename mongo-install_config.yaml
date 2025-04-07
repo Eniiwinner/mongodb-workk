@@ -81,14 +81,6 @@
         state: started
         enabled: yes
     
-    - name: Open MongoDB port in firewall
-      firewalld:
-        port: 27017/tcp
-        permanent: yes
-        state: enabled
-      notify: reload firewall
-      ignore_errors: yes
-    
     - name: Install PyMongo dependency
       block:
         - name: Install pip (if not present)
@@ -208,10 +200,4 @@
       service:
         name: mongod
         state: restarted
-    
-    - name: reload firewall
-      service:
-        name: firewalld
-        state: reloaded
-      ignore_errors: yes
 ...
