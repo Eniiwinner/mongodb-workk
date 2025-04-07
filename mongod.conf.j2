@@ -2,8 +2,9 @@
 
 # Network interface settings
 net:
-  port: 27017      
-  bindIp: {{ mongodb_bind_ip }}   
+  net:
+  port: 27017
+  bindIp: 0.0.0.0 
 
 # Storage settings
 storage:
