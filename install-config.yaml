@@ -1,5 +1,5 @@
 ---
-- name: Install and Deploy MongoDB with Node.js App on CentOS 9
+- name: Install and Deploy MongoDB with Node.js App
   hosts: n1
   become: true
   vars:
@@ -11,6 +11,7 @@
     node_user: "{{ ansible_user_id }}"
     app_repo: "https://github.com/Eniiwinner/mongodb-workk.git"
     app_branch: "main"
+    mongodb_connection_timeout: 60
 
   tasks:
 
@@ -43,7 +44,8 @@
         state: directory
         mode: 0755
 
-    - name: Configure MongoDB
+
+    - name: Configure MongoDB to listen only on 172.31.86.23
       template:
         src: db.j2
         dest: /etc/db.conf
@@ -57,92 +59,19 @@
         name: mongod
         state: started
         enabled: yes
+      async: 120
+      poll: 0
 
-    - name: Install PyMongo dependency
-      block:
-        - name: Install pip (if not present)
-          dnf:
-            name: python3-pip
-            state: present
-
-        - name: Install PyMongo using pip
-          pip:
-            name: pymongo
-            executable: pip3
-          register: pip_install
-          until: pip_install is succeeded
-          retries: 3
-          delay: 5
-
-
-    - name: Add NodeSource repository
+    - name: Verify MongoDB is listening on correct IP
       shell: |
-        curl -fsSL https://rpm.nodesource.com/setup_{{ node_version }} | bash -
-      args:
-        executable: /bin/bash
-      register: nodesource_setup
-      changed_when: "'Run as root' not in nodesource_setup.stdout"
-
-    - name: Install Node.js and npm
-      dnf:
-        name: nodejs
-        state: present
-        disable_gpg_check: yes
-      when: nodesource_setup is succeeded
-
-    - name: Verify Node.js installation
-      command: node --version
-      register: node_version_check
+        ss -tulnp | grep '172.31.86.23:27017'
+      register: mongo_listening
       changed_when: false
-
-    - name: Create Node.js project directory
-      file:
-        path: "{{ node_project_path }}"
-        state: directory
-        mode: 0755
-        owner: "{{ node_user }}"
-        group: "{{ node_user }}"
-
-    - name: Clone Node.js app repo
-      git:
-        repo: "{{ app_repo }}"
-        dest: "{{ node_project_path }}"
-        version: "{{ app_branch }}"
-        force: yes
-        update: yes
-
-    - name: Install project dependencies
-      npm:
-        path: "{{ node_project_path }}"
-        state: present
-        production: yes
-      when: node_version_check.rc == 0
-      environment:
-        NPM_CONFIG_PREFIX: "{{ node_project_path }}/.npm-global"
-      vars:
-        ansible_become_user: "{{ node_user }}"
-
-    - name: Create .env file
-      copy:
-        dest: "{{ node_project_path }}/.env"
-        content: |
-          PORT=3000
-          MONGO_URI=mongodb://172.31.86.23:27017/devops-api
-          ADMIN_USER={{ mongodb_admin_user }}
-          ADMIN_PASSWORD={{ mongodb_admin_password }}
-        owner: "{{ node_user }}"
-        group: "{{ node_user }}"
-        mode: 0640
-
-    - name: Install PM2 globally
-      npm:
-        name: pm2
-        global: yes
-      when: node_version_check.rc == 0
+      failed_when: mongo_listening.rc != 0
 
     - name: Create admin user
       community.mongodb.mongodb_user:
-        login_host: "172.31.86.23" 
+        login_host: "172.31.86.23"
         login_port: 27017
         database: admin
         name: "{{ mongodb_admin_user }}"
@@ -151,21 +80,14 @@
         state: present
         update_password: always
       register: user_creation
-      retries: 5
-      delay: 10
+      retries: 10
+      delay: 15
       until: user_creation is succeeded
 
-    - name: Start Node.js app with PM2
-      shell: |
-        pm2 start {{ node_project_path }}/app.js --name myapp
-        pm2 save
-        pm2 startup
-      args:
-        chdir: "{{ node_project_path }}"
-      when: node_version_check.rc == 0
 
   handlers:
     - name: restart mongod
       service:
         name: mongod
         state: restarted
+...
