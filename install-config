@@ -1,0 +1,195 @@
+---
+- name: Install and Configure MongoDB on CentOS 9 and Create Admin User
+  hosts: n1
+  become: true
+  vars:
+    mongodb_primary_ip: "172.31.86.23"
+    mongodb_admin_user: "Eniola"
+    mongodb_admin_password: "admin123!"
+    mongodb_restart_timeout: 60
+    mongodb_connection_timeout: 60
+
+  tasks:
+   
+    - name: Add MongoDB GPG key
+      rpm_key:
+        state: present
+        key: "https://www.mongodb.org/static/pgp/server-7.0.asc"
+    
+    - name: Add MongoDB repository
+      yum_repository:
+        name: mongodb-org-7.0
+        description: MongoDB Repository
+        baseurl: https://repo.mongodb.org/yum/redhat/9/mongodb-org/7.0/x86_64/
+        gpgcheck: yes
+        gpgkey: https://www.mongodb.org/static/pgp/server-7.0.asc
+        enabled: yes
+    
+    - name: Install MongoDB packages
+      dnf:
+        name:
+          - mongodb-org
+          - mongodb-org-server
+          - mongodb-mongosh
+          - mongodb-database-tools
+        state: present
+    
+    - name: Create custom MongoDB config directory
+      file:
+        path: /etc/mongod.conf.d
+        state: directory
+        mode: 0755
+    
+    - name: Create MongoDB configuration file
+      copy:
+        dest: /etc/mongod.conf
+        content: |
+          # mongod.conf
+          
+          # Where and how to store data.
+          storage:
+            dbPath: /var/lib/mongo
+            journal:
+              enabled: true
+          
+          # where to write logging data.
+          systemLog:
+            destination: file
+            logAppend: true
+            path: /var/log/mongodb/mongod.log
+          
+          # network interfaces
+          net:
+            port: 27017
+            bindIp: 0.0.0.0  # Allow connections from any IP
+          
+          # security settings
+          security:
+            authorization: enabled
+        owner: root
+        group: root
+        mode: 0644
+      notify: restart mongod
+    
+    - name: Create MongoDB log directory
+      file:
+        path: /var/log/mongodb
+        state: directory
+        owner: mongod
+        group: mongod
+        mode: 0755
+    
+    - name: Start and enable MongoDB service
+      service:
+        name: mongod
+        state: started
+        enabled: yes
+    
+    - name: Install PyMongo dependency
+      block:
+        - name: Install pip (if not present)
+          dnf:
+            name: python3-pip
+            state: present
+        
+        - name: Install PyMongo using pip
+          pip:
+            name: pymongo
+            executable: pip3
+          register: pip_install
+          until: pip_install is succeeded
+          retries: 3
+          delay: 5
+    
+    - name: Wait for MongoDB to start accepting connections
+      wait_for:
+        host: "{{ mongodb_primary_ip }}"
+        port: 27017
+        delay: 10
+        timeout: 60
+    
+    - name: Check MongoDB authentication status
+      shell: |
+        grep -A1 "security:" /etc/mongod.conf || echo "auth_not_found"
+      args:
+        executable: /bin/bash
+      register: auth_status
+      changed_when: false
+      ignore_errors: true
+
+    - name: Display authentication status
+      debug:
+        var: auth_status.stdout
+
+    - name: Temporarily disable authentication if enabled
+      block:
+        - name: Backup mongod.conf
+          copy:
+            src: /etc/mongod.conf
+            dest: /etc/mongod.conf.bak
+            remote_src: true
+
+        - name: Disable authentication
+          replace:
+            path: /etc/mongod.conf
+            regexp: '(?m)^(\s*)authorization:\s*enabled'
+            replace: '\1# authorization: disabled_temp'
+          notify: restart mongod
+
+        - name: Verify MongoDB is reachable
+          wait_for:
+            host: "{{ mongodb_primary_ip }}"
+            port: 27017
+            timeout: "{{ mongodb_connection_timeout }}"
+            delay: 5
+          register: port_check
+          until: port_check is succeeded
+          retries: 3
+
+      when: "'authorization: enabled' in auth_status.stdout"
+
+    - name: Create admin user
+      community.mongodb.mongodb_user:
+        login_host: "{{ mongodb_primary_ip }}"
+        login_port: 27017
+        database: admin
+        name: "{{ mongodb_admin_user }}"
+        password: "{{ mongodb_admin_password }}"
+        roles: "root"
+        state: present
+        connect_timeout: 30
+        socket_timeout: 30
+      register: user_creation
+      retries: 3
+      delay: 5
+
+    - name: Re-enable authentication if needed
+      block:
+        - name: Restore auth config
+          replace:
+            path: /etc/mongod.conf
+            regexp: '# authorization: disabled_temp'
+            replace: 'authorization: enabled'
+          notify: restart mongod
+
+        - name: Verify MongoDB is secure
+          command: >
+            mongosh --host "{{ mongodb_primary_ip }}"
+            --username "{{ mongodb_admin_user }}"
+            --password "{{ mongodb_admin_password }}"
+            --eval "db.adminCommand({ping: 1})"
+          register: mongo_auth_test
+          changed_when: false
+          failed_when: "mongo_auth_test.rc != 0 or 'ok' not in mongo_auth_test.stdout"
+
+      when: "'authorization: enabled' in auth_status.stdout and user_creation is succeeded"
+
+  handlers:
+    - name: restart mongod
+      service:
+        name: mongod
+        state: restarted
+        enabled: yes
+      async: "{{ mongodb_restart_timeout }}"
+      poll: 0
+...
