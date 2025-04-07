@@ -4,7 +4,6 @@
   become: true
   vars:
     mongodb_primary_ip: "172.31.86.23"
-"  
     mongodb_admin_user: "Eniola"
     mongodb_admin_password: "admin123!"
 
