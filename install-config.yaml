@@ -11,8 +11,8 @@
     node_user: "{{ ansible_user_id }}"
     app_repo: "https://github.com/Eniiwinner/mongodb-workk.git"
     app_branch: "main"
-    mongodb_connection_timeout: 60
-    mongodb_config_file: "/etc/db.conf"  
+    mongodb_connection_timeout: 120  
+    mongodb_config_file: "/etc/db.conf"
 
   tasks:
     - name: Add MongoDB GPG key
@@ -38,20 +38,28 @@
           - mongodb-database-tools
         state: present
 
-    - name: Create custom MongoDB config directory
+    - name: Ensure MongoDB data directory exists
       file:
-        path: /etc/mongod.conf.d
+        path: /var/lib/mongo
         state: directory
+        owner: mongod
+        group: mongod
         mode: 0755
 
     - name: Configure MongoDB
       template:
         src: db.j2
-        dest: "{{ mongodb_config_file }}" 
+        dest: "{{ mongodb_config_file }}"
         owner: root
         group: root
         mode: 0644
       notify: restart mongod
+
+    - name: Create systemd override directory
+      file:
+        path: /etc/systemd/system/mongod.service.d
+        state: directory
+        mode: 0755
 
     - name: Create systemd override to use custom config
       blockinfile:
@@ -71,13 +79,15 @@
         state: started
         enabled: yes
 
-    - name: Verify MongoDB is listening
+    - name: Wait for MongoDB to become available
       wait_for:
         host: "{{ mongodb_bind_ip }}"
         port: 27017
         timeout: "{{ mongodb_connection_timeout }}"
-      register: mongo_listening
-      changed_when: false
+        delay: 10
+      register: mongo_ready
+      until: mongo_ready is succeeded
+      retries: 5
 
     - name: Create admin user
       community.mongodb.mongodb_user:
