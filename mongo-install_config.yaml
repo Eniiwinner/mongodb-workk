@@ -70,13 +70,6 @@
       retries: 5
       delay: 10
 
-    - name: Wait for MongoDB to become available
-      wait_for:
-        port: 27017
-        delay: 5
-        timeout: 60
-      when: mongo_service is succeeded
-
     - name: Install PyMongo dependency
       block:
         - name: Install pip (if not present)
