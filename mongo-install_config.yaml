@@ -6,11 +6,23 @@
     mongodb_bind_ip: "172.31.86.23"
     mongodb_admin_user: "Eniola"
     mongodb_admin_password: "admin123!"
-    mongodb_restart_timeout: 90 
-    mongodb_connection_timeout: 90 
-    mongodb_connection_retries: 5 
+    mongodb_restart_timeout: 60
+    mongodb_connection_timeout: 60
 
   tasks:
+
+    - name: Check MongoDB authentication status
+      shell: |
+        grep -A1 "security:" /etc/mongod.conf || echo "auth_not_found"
+      args:
+        executable: /bin/bash
+      register: auth_status
+      changed_when: false
+      ignore_errors: true
+
+    - name: Display authentication status
+      debug:
+        var: auth_status.stdout
 
     - name: Temporarily disable authentication if enabled
       block:
@@ -25,33 +37,20 @@
             path: /etc/mongod.conf
             regexp: '(?m)^(\s*)authorization:\s*enabled'
             replace: '\1# authorization: disabled_temp'
-          notify: restart mongod
 
-        - name: Verify MongoDB service is running
-          systemd:
+        - name: Restart MongoDB
+          service:
             name: mongod
-            state: started
-            enabled: yes
-          register: mongo_service
-          until: mongo_service is succeeded
-          retries: 5
-          delay: 10
+            state: restarted
+          async: "{{ mongodb_restart_timeout }}"
+          poll: 0
 
-        - name: Verify MongoDB is reachable (with retries)
+        - name: Verify MongoDB is reachable
           wait_for:
             host: "{{ mongodb_bind_ip }}"
             port: 27017
             timeout: "{{ mongodb_connection_timeout }}"
-            delay: 10
-          register: port_check
-          until: port_check is succeeded
-          retries: "{{ mongodb_connection_retries }}"
-          ignore_errors: yes
-
-        - name: Debug connection issues if any
-          debug:
-            msg: "MongoDB connection failed after multiple attempts. Check service status and logs."
-          when: port_check is failed
+            delay: 5
 
       when: "'authorization: enabled' in auth_status.stdout"
 
@@ -60,5 +59,4 @@
       service:
         name: mongod
         state: restarted
-      async: "{{ mongodb_restart_timeout }}"
-      poll: 0
+...
